@@ -23,7 +23,8 @@ def load_data(nrows):
     data.rename(lowercase, axis='columns', inplace=True)
     data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN])
     return data
-    
+st.subheader('Raw data')
+st.write(data)    
 # Create a text element and let the reader know the data is loading.
 data_load_state = st.text('Loading data...')
 # Load 10,000 rows of data into the dataframe.
