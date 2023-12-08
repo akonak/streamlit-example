@@ -35,6 +35,11 @@ data_load_state.text('Loading data...done!')
 st.subheader('Raw data')
 st.write(data) 
 
+st.subheader('Number of pickups by hour')
+
+hist_values = np.histogram(
+    data[DATE_COLUMN].dt.hour, bins=24, range=(0,24))[0]
+
 num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
 num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
 num_variables = st.slider("Test", 1, 300, 31)
