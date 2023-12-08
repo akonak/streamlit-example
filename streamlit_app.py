@@ -3,75 +3,175 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-"""
-# Welcome to Streamlit!
-
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:.
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
-
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
-st.title('Uber pickups in NYC')
-DATE_COLUMN = 'date/time'
-DATA_URL = ('https://s3-us-west-2.amazonaws.com/'
-         'streamlit-demo-data/uber-raw-data-sep14.csv.gz')
-
-def load_data(nrows):
-    data = pd.read_csv(DATA_URL, nrows=nrows)
-    lowercase = lambda x: str(x).lower()
-    data.rename(lowercase, axis='columns', inplace=True)
-    data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN])
-    return data
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import streamlet as st
+import matplotlib.pyplot as plt
 
 
-   
-# Create a text element and let the reader know the data is loading.
-data_load_state = st.text('Loading data...')
-# Load 10,000 rows of data into the dataframe.
-data = load_data(10000)
-# Notify the reader that the data was successfully loaded.
-data_load_state.text('Loading data...done!')
-
-if st.checkbox('Show raw data'):
-    st.subheader('Raw data')
-    st.write(data)
+df = pd.read_csv('indicator.csv', header=0, index_col='no')
+df2 = pd.read_csv('SurveyResultWeights.csv', index_col = 0)
+adf = pd.read_csv('AdaptiveIndicators.csv', header=0,index_col = 'no')
+cdf = pd.read_csv('CopingIndicators.csv', header=0, index_col = 'no')
 
 
-st.subheader('Number of pickups by hour')
+#idx = pd.Index(range(1, 33, 1))
+#df.reindex(idx)
+#df.set_index('no',inplace=True)
+st.title('Drought Resilience DSS')
 
-hist_values = np.histogram(data[DATE_COLUMN].dt.hour, bins=24, range=(0,24))[0]
-st.bar_chart(hist_values)
+Sindicators = []
 
-st.subheader('Map of all pickups')
-hour_to_filter = st.slider('hour', 0, 23, 17) 
-filtered_data = data[data[DATE_COLUMN].dt.hour == hour_to_filter]
-st.subheader(f'Map of all pickups at {hour_to_filter}:00')
-st.map(filtered_data)
+Cindicators = []
 
-num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
-num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
-num_variables = st.slider("Test", 1, 300, 31)
+Aindicators = []
 
-indices = np.linspace(0, 1, num_points)
-theta = 2 * np.pi * num_turns * indices
-radius = indices
+for (columnName, columnData) in df.iterrows():
+    if columnData["type"] == 's':
+        Sindicators.append(columnData["body"])
+    if columnData["type"] == 'c':
+        Cindicators.append(columnData["body"])
+    if columnData["type"] == 'a':
+        Aindicators.append(columnData["body"])
 
-x = radius * np.cos(theta)
-y = radius * np.sin(theta)
+susceptability = 0
+s1 = 0
+s2 = 0
+Schoice = st.multiselect('Which susceptibility indicators would you like to use?', (Sindicators))
+for item in Schoice:
+    for (index, columnData) in df.iterrows():
+        if columnData['body'] == item:
+            if columnData['display'] == 'slider':
+                a = st.slider(columnData['body'], 0, columnData['range'])
+                df.amount[index] = a
+                df.standard[index] = a/columnData['range']
+                s1 += df.loc[index, "standard"]*df.loc[index, "weights"]*df.loc[index, "direction"]
+                s2 += df.loc[index, "weights"]
+            if columnData['display'] == 'radio':
+                a = st.radio(columnData['body'], ['Yes','No'])
+                df.amount[index] = a
+                df.standard[index] = a
+                if df.loc[index, "standard"] == ("Yes"):
+                    placeholder=1
+                else: 
+                    placeholder =0
+                s1 += placeholder*df.loc[index, "weights"]*df.loc[index, "direction"]
+                s2 += df.loc[index, "weights"]
+if s1>0 and s2>0:
+    susceptability = s1/s2
+    st.write(susceptability)
 
-df = pd.DataFrame({
-    "x": x,
-    "y": y,
-    "idx": indices,
-    "rand": np.random.randn(num_points),
-})
+coping = 0
+c1=0
+c2=0
+Cchoice = st.multiselect('Which coping capacity indicators would you like to use?',  (Cindicators))
+for item in Cchoice:
+    for (index, columnData) in df.iterrows():
+        if columnData['body'] == item:
+            if columnData['display'] == 'slider':
+                a = st.slider(columnData['body'], 0, columnData['range'])
+                df.amount[index] = a
+                df.standard[index] = a/columnData['range']
+                c1 += df.loc[index, "standard"]*df.loc[index, "weights"]*df.loc[index, "direction"]
+                c2 += df.loc[index, "weights"]
+            if columnData['display'] == 'radio':
+                a = st.radio(columnData['body'], ['Yes','No'])
+                if a == 'Yes': 
+                    df.amount[index] = 1
+                    df.standard[index] = 1
+                elif a == 'No':
+                    df.amount[index] = 0
+                    df.standard[index] = 0
+                if df.loc[index, "standard"] == ("Yes"):
+                    placeholder=1
+                else: 
+                    placeholder =0
+                c1 += placeholder*df.loc[index, "weights"]*df.loc[index, "direction"]
+                c2 += df.loc[index, "weights"]
+if c1>0 and c2>0:
+    coping = c1/c2
+    st.write(coping)
 
-st.altair_chart(alt.Chart(df, height=700, width=700)
-    .mark_point(filled=True)
-    .encode(
-        x=alt.X("x", axis=None),
-        y=alt.Y("y", axis=None),
-        color=alt.Color("idx", legend=None, scale=alt.Scale()),
-        size=alt.Size("rand", legend=None, scale=alt.Scale(range=[1, 150])),
-    ))
+adaptive = 0
+a1=0
+a2=0
+Achoice = st.multiselect('Which adaptive capacity indicators would you like to use?',  (Aindicators))
+for item in Achoice:
+    for (index, columnData) in df.iterrows():
+        if columnData['body'] == item:
+            if columnData['display'] == 'slider':
+                a = st.slider(columnData['body'], 0, columnData['range'])
+                df.amount[index] = a
+                df.standard[index] = a/columnData['range']
+                a1 += df.loc[index, "standard"]*df.loc[index, "weights"]*df.loc[index, "direction"]
+                a2 += df.loc[index, "weights"]
+            if columnData['display'] == 'radio':
+                a = st.radio(columnData['body'], ['Yes','No'])
+                if a == 'Yes': 
+                    df.amount[index] = 1
+                    df.standard[index] = 1
+                elif a == 'No':
+                    df.amount[index] = 0
+                    df.standard[index] = 0
+                a1 += df.loc[index, "amount"]*df.loc[index, "weights"]*df.loc[index, "direction"]
+                a2 += df.loc[index, "weights"]
+if a2 > 0 and a1 > 0:
+    adaptive = a1/a2
+
+
+
+col1, col2, col3 = st.columns(3)
+#drawing the graph
+scircle = plt.Circle(xy =(0,0), radius = 0.75, facecolor = 'white')
+
+labels = ['Resiliense Score', 'other']
+values = [susceptability, 1-susceptability]
+fig = px.pie(labels, values = values, hole = 0.5,
+              names = labels, color = labels,
+              title = 'Susceptability Score',
+              color_discrete_map = {'score':'blue', 'other': 'black'
+             })
+fig.update_traces(
+                   title_font = dict(size=25,family='Verdana', 
+                                     color='darkred'),
+                   hoverinfo='label+percent',
+                   textinfo='percent', textfont_size=15)
+st.plotly_chart(fig)
+plt.gca().add_artist(scircle)
+
+
+
+ccircle = plt.Circle(xy =(0,0), radius = 0.75, facecolor = 'white')
+
+labels = ['Resiliense Score', 'other']
+values = [coping, 1-coping]
+fig = px.pie(labels, values = values, hole = 0.5,
+              names = labels, color = labels,
+              title = 'Coping Capacity Score',
+              color_discrete_map = {'score':'blue', 'other': 'black'
+             })
+fig.update_traces(
+                   title_font = dict(size=25,family='Verdana', 
+                                     color='darkred'),
+                   hoverinfo='label+percent',
+                   textinfo='percent', textfont_size=15)
+st.plotly_chart(fig)
+plt.gca().add_artist(ccircle)
+
+acircle = plt.Circle(xy =(0,0), radius = 0.75, facecolor = 'white')
+
+labels = ['Resiliense Score', 'other']
+values = [adaptive, 1-adaptive]
+fig = px.pie(labels, values = values, hole = 0.5,
+              names = labels, color = labels,
+              title = 'Adaptive Capacity Score',
+              color_discrete_map = {'score':'blue', 'other': 'black'
+             })
+fig.update_traces(
+                   title_font = dict(size=25,family='Verdana', 
+                                     color='darkred'),
+                   hoverinfo='label+percent',
+                   textinfo='percent', textfont_size=15)
+st.plotly_chart(fig)
+plt.gca().add_artist(acircle)
